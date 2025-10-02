@@ -100,107 +100,161 @@
 
 //--------------------------------------------------------------------------------------------------------------------------------------
 
-//DESAFIO NIVEL INTERMEDIARIO
+//DESAFIO NIVEL AVANÇADO MESTRE
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <locale.h>
 
 //--constantes globais
 #define MAX_TERRITORIO 5
 #define TAM_NOME 30
 #define TAM_COR 10
+#define MAX_MISSOES 5
+#define TAM_MISSAO 100
 
-//--numeros aleatorios para os dados
-int Dados()
-{
-    int dado = rand() % 6 + 1; // dado de 1 a 6
-    return dado;
-}
+//--constante aux para verificacao
+int vitoriaAtacante = 0;
+int vitoriaDefensor = 0;
 
-//--definição da estrutura (struct)
-typedef struct
-{
+//--criacao de estruturas (structs)
+typedef struct{
     char nome[TAM_NOME];
     char cor[TAM_COR];
     int tropas;
 } Territorio;
 
-//--função para limpar o buffer de entrada
-void limparBuffer()
-{
-    int buffer;
-    while ((buffer = getchar()) != '\n' && buffer != EOF)
-        ;
+typedef struct{
+    char missaoAleatoria[TAM_MISSAO];
+    int indice;
+} Missao;
+
+//--alocacao de memoria para territorios
+Territorio *alocarTerritorios() {
+    Territorio *territorio = (Territorio*) calloc(MAX_TERRITORIO, sizeof(Territorio));
+    return territorio;
 }
-/*
-getchar() lê caractere por caractere
-Continua lendo até achar \n (ENTER) ou EOF
-Isso "limpa" o restante da linha que o scanf deixou no buffer */
 
-//--funcao ataque
-void Atacar(Territorio *atacante, Territorio *defensor)
-{
-    int dadoAtacante = Dados();
-    int dadoDefensor = Dados();
-
-    printf("\nO Atacante %s rolou %d\n", (*atacante).nome, dadoAtacante);
-    printf("O Defensor %s rolou %d\n", (*defensor).nome, dadoDefensor);
-    //--exibindo resultado
-    printf("-------------------------------------\n");
-    printf("        Resultado da Batalha       \n");
-    printf("-------------------------------------\n");
-
-    if (dadoAtacante > dadoDefensor)
-    {
-        printf("O Atacante venceu! O Defensor perde 1 tropa.\n");
-        (*defensor).tropas--; // defensor perde uma tropa
-        (*atacante).tropas++; // atacante ganha 1 tropa
-    }
-    else if (dadoAtacante == dadoDefensor)
-    {
-        printf("Deu empate! Ninguem perde tropas.\n");
-    }
-    else
-    {
-        printf("O Defensor venceu! O Atacante perde 1 tropa.\n");
-        (*atacante).tropas--; // atacante perde uma tropa
-        (*defensor).tropas++; // defensor ganha uma tropa
-    }
-
-    if ((*atacante).tropas == 0)
-    {
-        strcpy((*atacante).cor, (*defensor).cor); // muda cor do atacante
-    }
-    else if ((*defensor).tropas == 0)
-    {
-        strcpy((*defensor).cor, (*atacante).cor); // muda cor do defensor
-    }
-
-    printf("\nPressione Enter para jogar a próxima rodada...");
-    getchar();
+//--alocacao de memoria para missoes
+Missao *alocarMissoes(){
+    Missao *missao = (Missao*) calloc(MAX_MISSOES, sizeof(Missao));
+    return missao;
 }
+
+//--prototipo das funcoes
+int rolagemDados();
+void limparBuffer();
+//---criacao e exibicao de territorios
+void criarTerritorio(Territorio *territorio);
+void exibirMenu();
+void exibirMapa(Territorio *territorio);
+//---atribuicao e exibicao de missoes
+void atribuirMissao(Missao *missao, char *missoesDisponiveis[], int totalMissoes);
+void exibirMissao(const Missao *missao);
+//---verificar missao
+void verificarMissao();
+//---logica de ataque
+void atacarFase(Territorio *territorio);
+void atacarSimulacao(Territorio *territorio, int atacante, int defensor);
+//---liberacao de memoria
+void liberarMemoria(Territorio *territorio, Missao *missao);
 
 //--função main
 int main()
 {
+    setlocale(LC_ALL, "Portuguese");
     srand(time(NULL)); // Inicializa o gerador de números aleatórios
+    int opcao;
 
-    int totalTerritorio = 0;
-    int opcaoAtacante;
-    int opcaoDefensor;
+    //--lista de missoes
+    const char *missoesDisponiveis[] = {
+        "Conquistar 03 territorios como Territorio Atacante",
+        "Perder 01 tropa para o Territorio Defensor",
+        "Obter 05 vitorias como Territorio Atacante ou Defensor",
+        "Vencer 02 vezes como Territorio Atacante e 02 vezes como Territorio Defensor",
+        "Conquistar 03 territorios como Territorio Defensor"
+    };
 
-    //--alocaçao de memoria
-    Territorio *terr = (Territorio *)calloc(MAX_TERRITORIO, sizeof(Territorio));
+    /*
+    para calcular o numero de itens, sizeof(missoesDisponiveis) da o tamanho total do array em bytes,
+    sizeof(missoesDisponiveis[0]) da o tamanho de um elemento (um ponteiro char*) em bytes,
+    assim, a divisao de ambos nos da o numero de elementos
+    */
 
-    if (terr == NULL)
-    {//--teste de erro caso a alocaçao de memoria nao tenha funcionado
-        printf("Erro: Falha ao alocar memória.\n");
+    int totalMissoes = sizeof(missoesDisponiveis) / sizeof(missoesDisponiveis[0]);
+
+    //alocar memoria
+    Territorio *territorio = alocarTerritorios(MAX_TERRITORIO);
+    Missao *missao = alocarMissoes(MAX_MISSOES);
+
+    //--confere se a alocacao funcionou; se nao, retorna 1 para indicar erro
+    if (territorio == NULL || missao == NULL){
+        printf("Erro: Falha ao alocar memoria.\n");
         return 1;
     }
 
-    // loop
+    //preencher territorio
+    criarTerritorio(territorio);
+
+    //sorteia missao
+    atribuirMissao(missao, missoesDisponiveis, MAX_MISSOES);
+
+    //laco
+    do {
+        //exibe mapa missao e menu a cada iteracao
+        exibirMapa(territorio);
+        exibirMissao(missao);
+
+        exibirMenu();
+        scanf("%d", &opcao);
+        limparBuffer();
+
+        switch(opcao){
+            case 1:
+            atacarFase(territorio);
+            break;
+
+            case 2:
+            verificarMissao(missao, territorio);
+            break;
+
+            case 0:
+            printf("\nSaindo...\n");
+            break;
+
+            default:
+            printf("\nOpcao invalida. Pressione Enter para tentar novamente.");
+            getchar();
+            break;
+        }
+
+    } while (opcao != 0);
+
+    //limpeza de memoria
+    liberarMemoria(territorio, missao);
+    printf("Memorias liberadas com sucesso!\n");
+
+    return 0;
+}
+
+//--implementacao das funcoes
+
+//---rolagem de dados para decidir o vencedor de cada rodada
+int rolagemDados(){
+    int dado = rand() % 6 +1; //--dado de 1 a 6
+    return dado;
+}
+
+//---limpar buffer de entrada para evitar problema de leitura consecutiva de scanf e getchar
+void limparBuffer(){
+    int buffer;
+    while ((buffer = getchar()) != '\n' && buffer != EOF);
+}
+
+//---criacao e exibicao de territorios
+void criarTerritorio(Territorio *territorio){
     printf("=====================================\n");
     printf("============ PROJETO WAR ============\n");
     printf("=====================================\n");
@@ -209,80 +263,180 @@ int main()
     printf("        Cadastro de Territórios       \n");
     printf("-------------------------------------\n\n");
 
-    //--loop
+    //--o usuario cadastra cinco territorios para jogar
     for (int i = 0; i < MAX_TERRITORIO; i++)
     {
         printf("        TERRITÓRIO %d      \n\n", i + 1);
         printf("Digite o nome do território: ");
-        fgets((terr[i]).nome, TAM_NOME, stdin);
+        fgets(territorio[i].nome, TAM_NOME, stdin);
+        territorio[i].nome[strcspn(territorio[i].nome, "\n")] = '\0';
 
         printf("Digite a cor do exército: ");
-        fgets((terr[i]).cor, TAM_COR, stdin);
-
-        (terr[i]).nome[strcspn(terr[i].nome, "\n")] = '\0';
-        //substitui o '\n' por '\0' que significa 'fim de string'
-        (terr[i]).cor[strcspn(terr[i].cor, "\n")] = '\0';
-        //substitui o '\n' por '\0' que significa 'fim de string'
+        fgets(territorio[i].cor, TAM_COR, stdin);
+        territorio[i].cor[strcspn(territorio[i].cor, "\n")] = '\0';
 
         printf("Digite a quantidade de tropas: ");
-        scanf("%d", &terr[i].tropas);
-        limparBuffer(); //limpa o '/n' deixado pelo scanf
-
-        totalTerritorio++;
+        scanf("%d", &territorio[i].tropas);
+        limparBuffer();
 
         printf("\n-------------------------------------\n");
         printf(" Território cadastrado com sucesso!\n");
         printf("-------------------------------------\n\n");
     }
+}
 
-    do
+//--exibir menu interativo
+void exibirMenu(){
+    printf("\n--- MENU ---\n");
+    printf("1 - Atacar\n");
+    printf("2 - Verificar Missao\n");
+    printf("0 - Sair\n");
+    printf("Escolha a sua proxima acao: ");
+}
+
+//--exibir mapa dos 5 territorios cadastrados
+void exibirMapa(Territorio *territorio){
+    printf("\n======================================\n");
+    printf("                 MAPA         \n");
+    printf("======================================\n");
+
+    for (int i = 0; i < MAX_TERRITORIO; i++){
+        printf("%d - Territorio %s (Exercito %s, Tropas: %d)\n", i + 1,
+        territorio[i].nome, territorio[i].cor, territorio[i].tropas);
+    }
+}
+
+//---atribuicao e exibicao de missoes
+void atribuirMissao(Missao *missao, char *missoesDisponiveis[], int totalMissoes){
+    int id = rand() % totalMissoes;
+    strcpy((*missao).missaoAleatoria, missoesDisponiveis[id]);
+    (*missao).indice = id;
+}
+
+void exibirMissao(const Missao *missao){
+    printf("\n--- SUA MISSAO ---\n");
+    printf("Sua missao é %s\n", (*missao).missaoAleatoria);
+}
+//---verificar missao
+
+void verificarMissao(Missao *missao, Territorio *territorio){
+
+    int sucesso;
+
+    //--MISSAO: 
+    if((*missao).indice = 0)//--Conquistar 03 territorios como territorio Atacante
     {
-        //--impressao do mapa
-        printf("======================================\n");
-        printf("                 MAPA         \n");
-        printf("======================================\n");
-
-        for (int i = 0; i < MAX_TERRITORIO; i++)
-        {
-            printf("%d - %s (Exercito %s, Tropas: %d)\n", i + 1,
-                   terr[i].nome, terr[i].cor, terr[i].tropas);
+        if(vitoriaAtacante >= 3){
+            sucesso = 1;
+        }
+    } else if((*missao).indice = 1)//--Perder 01 tropa para o territorio Defensor
+    {
+        if(vitoriaDefensor >= 1){
+            sucesso = 1;
+        }
+    } else if((*missao).indice = 2)//--Obter 05 vitorias como Atacante ou Defensor
+    {
+        if(vitoriaAtacante == 5 || vitoriaDefensor == 5){
+            sucesso = 1;
         }
 
-        //--area de ataque
-
-        printf("\n=====================================\n");
-        printf("                ATAQUE         \n");
-        printf("======================================\n");
-
-        printf("Escolha o território atacante (entre 1 e 5) ou 0 para Sair: ");
-        scanf("%d", &opcaoAtacante);
-        limparBuffer();
-
-        if (opcaoAtacante == 0)
-        {
-            printf("Saindo...\n");
-            break;
+    } else if((*missao).indice = 3)//--Vencer 02 vezes como Atacante e 02 vezes como Defensor
+    {
+        if(vitoriaAtacante >= 2 && vitoriaDefensor >= 2){
+            sucesso = 1;
         }
-        if (terr[opcaoAtacante - 1].tropas <= 0)
-        {
-            printf("O Território escolhido para Ataque não possui tropas.\n");
-            continue;
+    } else//--Conquistar 03 territorios como Territorio Defensor
+    {
+        if(vitoriaDefensor >= 3){
+            sucesso = 1;
         }
+    };
 
-        printf("Escolha o território defensor (entre 1 e 5): ");
-        scanf("%d", &opcaoDefensor);
-        limparBuffer();
+    printf("\n--- VERIFICAÇÃO ---\n");
+    if (sucesso == 1) {
+        printf("Parabens! Voce cumpriu a missao: %s\n", (*missao).missaoAleatoria);
+    } else {
+        printf("Infelizmente voce ainda nao cumpriu sua missao, %s\n", (*missao).missaoAleatoria);
+    }
 
-        if (terr[opcaoDefensor - 1].tropas <= 0)
-        {
-            printf("O Território escolhido para Defesa não possui tropas.\n");
-            continue;
+    printf("\nPressione Enter para continuar...");
+    getchar();
+}
+
+//---logica de ataque
+void atacarFase(Territorio *territorio){
+
+    int atacante, defensor;
+
+    printf("\n=====================================\n");
+    printf("            FASE DE ATAQUE         \n");
+    printf("======================================\n");
+
+    printf("Escolha o território atacante (entre 1 e 5): ");
+    scanf("%d", &atacante);
+    limparBuffer();
+
+    if (territorio[atacante - 1].tropas <= 0)
+    {
+        printf("O Território escolhido para Ataque não possui tropas.\n");
+        printf("\nPressione Enter para retornar ao Menu...");
+        getchar();
+        return;
+    }
+
+    printf("Escolha o território defensor (entre 1 e 5): ");
+    scanf("%d", &defensor);
+    limparBuffer();
+    
+    if (territorio[defensor - 1].tropas <= 0)
+    {
+        printf("O Território escolhido para Defesa não possui tropas.\n");
+        printf("\nPressione Enter para retornar ao Menu...");
+        getchar();
+        return;
+    }
+
+    atacarSimulacao(territorio, atacante - 1, defensor - 1);
+}
+
+//----------------------------------------------------------------------------------
+void atacarSimulacao(Territorio *territorio, int atacante, int defensor){
+
+    int dadoAtacante = rolagemDados();
+    int dadoDefensor = rolagemDados();
+        
+    printf("\nO Atacante %s rolou %d\n", territorio[atacante].nome, dadoAtacante);
+    printf("O defensor %s rolou %d\n", territorio[defensor].nome, dadoDefensor);
+
+    //--exibindo resultado
+    printf("-------------------------------------\n");
+    printf("        Resultado da Batalha       \n");
+    printf("-------------------------------------\n");
+
+    if (dadoAtacante > dadoDefensor){
+        territorio[defensor].tropas--; // defensor perde uma tropa
+        territorio[atacante].tropas++; // atacante ganha 1 tropa
+        printf("O Atacante venceu! O Defensor perde 1 tropa.\n");
+        vitoriaAtacante++;
+
+        if(territorio[defensor].tropas == 0){
+            strcpy(territorio[defensor].cor, territorio[atacante].cor); //--muda a cor do defensor para a do atacante
+            printf("O Defensor %s agora é do Exercito %s\n", territorio[defensor].nome, territorio[atacante].cor);
         }
+    } else if (dadoAtacante == dadoDefensor){
+        printf("Deu empate! Ninguem perde tropas.\n");
+    } else {
+        territorio[atacante].tropas--; // atacante perde uma tropa
+        printf("O Defensor venceu! O Atacante perde 1 tropa.\n");
+        vitoriaDefensor++;
+    }
 
-        Atacar(&terr[opcaoAtacante - 1], &terr[opcaoDefensor - 1]);
+    printf("\nPressione Enter para jogar a próxima rodada...");
+    getchar();
+}
 
-    } while (opcaoAtacante || opcaoDefensor != 0);
-
-    free(terr); //--libera a memoria
-    return 0; // fim do programa
+//---liberacao de memoria
+void liberarMemoria(Territorio *territorio, Missao *missao){
+    free(territorio);
+    free(missao);
 }
